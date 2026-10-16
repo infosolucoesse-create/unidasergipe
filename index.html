@@ -2143,8 +2143,10 @@ document.querySelector("#events").innerHTML = `
     <video
       id="eventVideo"
       src="${esc(EVENTO.video)}"
+      autoplay
       muted
       playsinline
+      webkit-playsinline
       controls
       preload="metadata"
       aria-label="${esc(EVENTO.t)}"
@@ -2157,19 +2159,42 @@ document.querySelector("#events").innerHTML = `
 `;
 
 const eventVideo = document.querySelector("#eventVideo");
-eventVideo.muted = true; // navegadores só liberam início automático sem som
+eventVideo.muted = true;          // início automático só é permitido sem som
+eventVideo.defaultMuted = true;
+eventVideo.setAttribute("playsinline","");
+
+let videoVisible = false;
+
+function tryPlay(){
+  if(videoVisible && eventVideo.paused){
+    const p = eventVideo.play();
+    if(p && p.catch){ p.catch(()=>{}); }
+  }
+}
 
 if("IntersectionObserver" in window){
   new IntersectionObserver(entries=>{
     entries.forEach(en=>{
-      if(en.isIntersecting){
-        eventVideo.play().catch(()=>{});
-      }else{
-        eventVideo.pause();
-      }
+      videoVisible = en.isIntersecting;
+      if(videoVisible){ tryPlay(); }
+      else{ eventVideo.pause(); }
     });
-  },{threshold:.35}).observe(eventVideo);
+  },{threshold:.25}).observe(eventVideo);
+}else{
+  videoVisible = true;
 }
+
+["loadedmetadata","canplay"].forEach(t=>
+  eventVideo.addEventListener(t,tryPlay)
+);
+
+// Alguns celulares só liberam o início depois do primeiro toque na página.
+const gestos = ["touchend","pointerup","click","keydown"];
+const liberar = () => tryPlay();
+gestos.forEach(g=>document.addEventListener(g,liberar,{passive:true}));
+eventVideo.addEventListener("playing",()=>{
+  gestos.forEach(g=>document.removeEventListener(g,liberar));
+});
 
 
 /* ==========================================================
